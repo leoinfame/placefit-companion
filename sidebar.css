@@ -12,3 +12,6 @@ ul{padding-left:17px;margin:0;color:#c4c4cc;font-size:11px;line-height:2}footer{
 .primary,.secondary{width:100%;border:0;border-radius:8px;padding:11px;font-weight:700;cursor:pointer;margin-top:10px}
 .primary{background:#16a34a;color:#fff}.secondary{background:#303137;color:#e4e4e7}
 .hidden{display:none!important}.result{margin-top:12px;font-size:12px;color:#d4d4d8}
+
+.lookup-row{display:flex;gap:8px;margin-top:12px}.lookup-row input{min-width:0;flex:1;background:#111214;border:1px solid #3f4148;color:#f4f4f5;border-radius:8px;padding:10px;font-size:12px}.lookup-row .primary{width:auto;margin:0;padding:0 14px}
+.edit-form{display:grid;gap:10px;margin-top:12px}.edit-form h4{font-size:12px;color:#86efac;margin:8px 0 0}.edit-field{display:grid;gap:5px;font-size:11px;color:#bfc0c7}.edit-field input,.edit-field textarea{width:100%;min-width:0;background:#111214;border:1px solid #3f4148;color:#f4f4f5;border-radius:7px;padding:9px;font:inherit;font-size:12px;resize:vertical}.edit-form button{margin-top:4px}.notice.error{background:#321d1d;color:#fecaca;border:1px solid #713b3b}
