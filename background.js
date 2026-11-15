@@ -1,4 +1,4 @@
-const API_BASE = "https://preview-sandbox--68c9d5dd3cf0f8fd8a834875--b-6762bee.base44.app/functions/crm-companion";
+const API_BASE = "https://preview-sandbox--68c9d5dd3cf0f8fd8a834875--b-6762bee.base44.app/api/apps/68c9d5dd3cf0f8fd8a834875/functions/crm-companion";
 const APP_ID = "68c9d5dd3cf0f8fd8a834875";
 const TRUSTED_ORIGINS = new Set(["https://preview-sandbox--68c9d5dd3cf0f8fd8a834875--b-6762bee.base44.app"]);
 
