@@ -124,24 +124,28 @@ async function lookup(phone,source="manual"){
   statusLine("Nenhuma conversa correspondente encontrada no CRM. Nenhum contato foi criado ou associado.");
 }
 async function checkAuth(){
-  const r=await api({action:"me"});
-  if(!r?.ok){
-    const code=r?.data?.error||r?.error||"UNKNOWN_ERROR";
-    const status=r?.status?("HTTP "+r.status+" · "):"";
-    const messages={
-      AUTH_REQUIRED:"A extensão não recebeu um token de sessão. Refaça a conexão.",
-      CRM_ACCESS_NOT_CONFIGURED:"Login recebido, mas este usuário não tem vínculo ativo configurado no CRM.",
-      MULTIPLE_WORKSPACES:"Este usuário pertence a mais de uma conta CRM. Precisamos selecionar o espaço correto.",
-      NOT_FOUND:"A função de integração não foi encontrada no ambiente de preview.",
-      INTERNAL_ERROR:"A função do CRM foi chamada, mas ocorreu um erro interno."
-    };
-    const detail=messages[code]||("A API do CRM respondeu: "+code+".");
-    showAuth(false,status+detail);
+  try{
+    const r=await api({action:"me"});
+    if(!r?.ok){
+      const code=r?.data?.error||r?.error||"UNKNOWN_ERROR";
+      const status=r?.status?("HTTP "+r.status+" · "):"";
+      const messages={
+        AUTH_REQUIRED:"A extensão não encontrou um token salvo. Faça login novamente.",
+        CRM_ACCESS_NOT_CONFIGURED:"Login válido, mas falta configurar o vínculo deste usuário no CRM.",
+        MULTIPLE_WORKSPACES:"Este usuário pertence a mais de um espaço CRM; precisamos selecionar um.",
+        NOT_FOUND:"A API crm-companion não foi encontrada neste ambiente.",
+        INTERNAL_ERROR:"A função do CRM retornou erro interno."
+      };
+      showAuth(false,status+(messages[code]||("Resposta da API: "+code)));
+      return false;
+    }
+    const u=r.data?.user||{},w=r.data?.workspace||{};
+    showAuth(true,"Conectado como "+(u.full_name||u.email||"usuário")+" · perfil "+(w.papel||"equipe")+".");
+    return true;
+  }catch(error){
+    showAuth(false,"Falha ao validar a sessão: "+(error?.message||String(error))+". Confira se a extensão está ativa em chrome://extensions.");
     return false;
   }
-  const u=r.data?.user||{},w=r.data?.workspace||{};
-  showAuth(true,"Conectado como "+(u.full_name||u.email||"usuário")+" · perfil "+(w.papel||"equipe")+".");
-  return true;
 }
 async function refreshContext(){
   const {activeContext}=await chrome.storage.session.get("activeContext");
