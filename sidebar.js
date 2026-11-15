@@ -1,17 +1,9 @@
-const contextEl = document.getElementById("context");
-
-async function refresh() {
-  const { activeContext } = await chrome.storage.session.get("activeContext");
-  if (!activeContext) {
-    contextEl.textContent = "Abra uma conversa no WhatsApp Web.";
-    return;
-  }
-  const hint = activeContext.chatHint;
-  contextEl.textContent = hint
-    ? `Número detectado na URL: ${hint}. Ainda não validado pelo CRM.`
-    : "Conversa aberta detectada. Identificação do contato pendente de validação.";
-}
-refresh();
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "session" && changes.activeContext) refresh();
-});
+const contextEl=document.getElementById("context"),resultEl=document.getElementById("result"),statusEl=document.getElementById("status"),authMessage=document.getElementById("auth-message"),connectBtn=document.getElementById("connect"),logoutBtn=document.getElementById("logout");
+function showAuth(connected,message){statusEl.textContent=connected?"CONECTADO":"DESCONECTADO";statusEl.classList.toggle("online",connected);authMessage.textContent=message;connectBtn.classList.toggle("hidden",connected);logoutBtn.classList.toggle("hidden",!connected);}
+async function api(payload){return chrome.runtime.sendMessage({type:"PLACEFIT_API_REQUEST",payload});}
+async function checkAuth(){const r=await api({action:"me"});if(!r?.ok){showAuth(false,r?.data?.error==="CRM_ACCESS_NOT_CONFIGURED"?"Login reconhecido, mas este usuário ainda não possui vínculo ativo com o CRM.":"Conecte sua conta PlaceFit para habilitar as consultas.");return;}const u=r.data.user||{},w=r.data.workspace||{};showAuth(true,"Conectado como "+(u.full_name||u.email||"usuário")+" · perfil "+(w.papel||"equipe")+".");}
+async function refreshContext(){const {activeContext}=await chrome.storage.session.get("activeContext");if(!activeContext){contextEl.textContent="Abra uma conversa no WhatsApp Web.";return;}contextEl.textContent=activeContext.chatHint?"Telefone detectado: "+activeContext.chatHint+".":"Conversa aberta detectada. O WhatsApp ainda não forneceu um telefone identificável nesta tela.";resultEl.classList.add("hidden");}
+connectBtn.addEventListener("click",()=>chrome.runtime.sendMessage({type:"PLACEFIT_OPEN_AUTH"}));
+logoutBtn.addEventListener("click",async()=>{await chrome.runtime.sendMessage({type:"PLACEFIT_LOGOUT"});showAuth(false,"Sessão encerrada neste navegador.");});
+chrome.storage.onChanged.addListener((c,a)=>{if(a==="session"&&(c.authToken||c.activeContext)){checkAuth();refreshContext();}});
+checkAuth();refreshContext();
