@@ -146,7 +146,22 @@ async function refreshContext(){
     statusLine("Identificação automática indisponível nesta conversa. O painel não tentará adivinhar o contato.");
   }
 }
-connectBtn.addEventListener("click",()=>chrome.runtime.sendMessage({type:"PLACEFIT_OPEN_AUTH"}));
+connectBtn.addEventListener("click",async()=>{
+  connectBtn.disabled=true;
+  const oldLabel=connectBtn.textContent;
+  connectBtn.textContent="Abrindo autenticação...";
+  authMessage.textContent="Solicitando abertura da página segura do PlaceFit...";
+  try{
+    const result=await chrome.runtime.sendMessage({type:"PLACEFIT_OPEN_AUTH"});
+    if(!result?.ok)throw new Error(result?.error||"Não foi possível abrir a página de autenticação.");
+    authMessage.textContent="Página de autenticação aberta em uma nova aba. Faça login no PlaceFit.";
+  }catch(error){
+    authMessage.textContent="Falha ao abrir a autenticação: "+(error?.message||"erro de comunicação com a extensão")+". Recarregue a extensão em chrome://extensions e tente novamente.";
+  }finally{
+    connectBtn.disabled=false;
+    connectBtn.textContent=oldLabel;
+  }
+});
 logoutBtn.addEventListener("click",async()=>{
   await chrome.runtime.sendMessage({type:"PLACEFIT_LOGOUT"});
   currentRecord=null;lastLookupKey="";resultEl.replaceChildren();
