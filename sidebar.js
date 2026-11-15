@@ -126,10 +126,20 @@ async function lookup(phone,source="manual"){
 async function checkAuth(){
   const r=await api({action:"me"});
   if(!r?.ok){
-    showAuth(false,r?.data?.error==="CRM_ACCESS_NOT_CONFIGURED"?"Login reconhecido, mas este usuário ainda não possui vínculo ativo com o CRM.":"Conecte sua conta PlaceFit para habilitar as consultas.");
+    const code=r?.data?.error||r?.error||"UNKNOWN_ERROR";
+    const status=r?.status?("HTTP "+r.status+" · "):"";
+    const messages={
+      AUTH_REQUIRED:"A extensão não recebeu um token de sessão. Refaça a conexão.",
+      CRM_ACCESS_NOT_CONFIGURED:"Login recebido, mas este usuário não tem vínculo ativo configurado no CRM.",
+      MULTIPLE_WORKSPACES:"Este usuário pertence a mais de uma conta CRM. Precisamos selecionar o espaço correto.",
+      NOT_FOUND:"A função de integração não foi encontrada no ambiente de preview.",
+      INTERNAL_ERROR:"A função do CRM foi chamada, mas ocorreu um erro interno."
+    };
+    const detail=messages[code]||("A API do CRM respondeu: "+code+".");
+    showAuth(false,status+detail);
     return false;
   }
-  const u=r.data.user||{},w=r.data.workspace||{};
+  const u=r.data?.user||{},w=r.data?.workspace||{};
   showAuth(true,"Conectado como "+(u.full_name||u.email||"usuário")+" · perfil "+(w.papel||"equipe")+".");
   return true;
 }
