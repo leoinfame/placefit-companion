@@ -14,13 +14,13 @@ chrome.runtime.onMessageExternal.addListener((message,sender,sendResponse) => {
 });
 chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if(message?.type==="PLACEFIT_CONTEXT"){
-    chrome.storage.session.set({activeContext:{url:sender.tab?.url||"",chatHint:message.chatHint||null,capturedAt:Date.now()}}).then(()=>sendResponse({ok:true}));return true;
+    chrome.storage.session.set({activeContext:{url:sender.tab?.url||"",chatHint:message.chatHint||null,capturedAt:Date.now()}}).then(()=>sendResponse({ok:true})).catch(e=>sendResponse({ok:false,error:e?.message||"CONTEXT_STORAGE_FAILED"}));return true;
   }
   if(message?.type==="PLACEFIT_OPEN_AUTH"){
     const url="https://preview-sandbox--68c9d5dd3cf0f8fd8a834875--b-6762bee.base44.app/CompanionAuth?extensionId="+encodeURIComponent(chrome.runtime.id);
-    chrome.tabs.create({url}).then(()=>sendResponse({ok:true}));return true;
+    chrome.tabs.create({url,active:true}).then(tab=>sendResponse({ok:true,tabId:tab?.id})).catch(e=>sendResponse({ok:false,error:e?.message||"TAB_OPEN_FAILED"}));return true;
   }
-  if(message?.type==="PLACEFIT_LOGOUT"){chrome.storage.session.remove(["authToken"]).then(()=>sendResponse({ok:true}));return true;}
+  if(message?.type==="PLACEFIT_LOGOUT"){chrome.storage.session.remove(["authToken"]).then(()=>sendResponse({ok:true})).catch(e=>sendResponse({ok:false,error:e?.message||"LOGOUT_FAILED"}));return true;}
   if(message?.type==="PLACEFIT_API_REQUEST"){
     (async()=>{
       const {authToken}=await chrome.storage.session.get("authToken");
