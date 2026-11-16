@@ -124,20 +124,30 @@ function renderSaveSummary(data){
   edit.addEventListener("click",()=>renderMatched(data));
   resultEl.append(edit);
 }
-async function lookup(phone,source="manual"){
-  const clean=String(phone||"").trim();
+let lookupSequence=0;
+async function lookup(identifier,source="manual"){
+  const isObject=identifier&&typeof identifier==="object";
+  const isLid=isObject&&Boolean(identifier.lid);
+  const clean=String(isObject?(identifier.phone||identifier.lid||""):identifier||"").trim();
   if(!clean){resultEl.replaceChildren();statusLine("Informe um telefone com DDD para pesquisar.",true);return;}
-  const key=clean.replace(/\D/g,"");
+  const key=(isLid?"lid:":"phone:")+clean.replace(/\\D/g,"");
   if(key===lastLookupKey&&currentRecord)return;
   lastLookupKey=key;currentRecord=null;
+  const sequence=++lookupSequence;
   resultEl.replaceChildren();statusLine("Consultando CRM...");
-  const response=await api({action:"contact.lookup",...(isLid?{lid:clean}:{phone:clean})});
-  resultEl.replaceChildren();
-  if(!response?.ok){statusLine(response?.data?.error||response?.error||"Não foi possível consultar o CRM.",true);return;}
-  const data=response.data||{};
-  if(data.status==="matched"){renderMatched(data);return;}
-  if(data.status==="ambiguous"){statusLine("Encontramos mais de uma conversa com este telefone. Não fizemos associação automática.",true);return;}
-  statusLine("Nenhuma conversa correspondente encontrada no CRM. Nenhum contato foi criado ou associado.");
+  try{
+    const response=await api({action:"contact.lookup",...(isLid?{lid:clean}:{phone:clean})});
+    if(sequence!==lookupSequence)return;
+    resultEl.replaceChildren();
+    if(!response?.ok){statusLine(response?.data?.error||response?.error||"Não foi possível consultar o CRM.",true);return;}
+    const data=response.data||{};
+    if(data.status==="matched"){renderMatched(data);return;}
+    if(data.status==="ambiguous"){statusLine("Encontramos mais de uma conversa com este identificador. Não fizemos associação automática.",true);return;}
+    statusLine("Nenhuma conversa correspondente encontrada no CRM. Nenhum contato foi criado ou associado.");
+  }catch(error){
+    if(sequence!==lookupSequence)return;
+    resultEl.replaceChildren();statusLine(error?.message||"Falha ao consultar o CRM.",true);
+  }
 }
 async function checkAuth(){
   try{
@@ -165,18 +175,25 @@ async function checkAuth(){
 }
 async function refreshContext(){
   const {activeContext}=await chrome.storage.session.get("activeContext");
-  if(!activeContext){contextEl.textContent="Abra uma conversa no WhatsApp Web ou informe o telefone abaixo.";return;}
+  // Invalida qualquer consulta pendente antes de trocar/limpar o contato.
+  lookupSequence++;currentRecord=null;lastLookupKey="";
+  resultEl.replaceChildren();
+  if(!activeContext){
+    lookupPhone.value="";
+    contextEl.textContent="Abra uma conversa no WhatsApp Web ou informe o telefone abaixo.";
+    statusLine("Aguardando uma conversa identificável.");
+    return;
+  }
   if(activeContext.chatHint||activeContext.lidHint){
     const identity=activeContext.chatHint?{phone:activeContext.chatHint}:{lid:activeContext.lidHint};
     contextEl.textContent=activeContext.chatHint?"Conversa ativa · telefone detectado: "+activeContext.chatHint+".":"Conversa ativa · identificador WhatsApp reconhecido (LID).";
     lookupPhone.value=activeContext.chatHint||"";
-    currentRecord=null;lastLookupKey="";
-    resultEl.replaceChildren();statusLine("Carregando os dados da conversa ativa...");
+    statusLine("Carregando os dados da conversa ativa...");
     if(await checkAuth())await lookup(identity,"whatsapp");
   }else{
-    contextEl.textContent="Conversa aberta, mas o WhatsApp não forneceu um telefone identificável. Use a busca manual; não faremos associação por nome ou LID desconhecido.";
-    resultEl.replaceChildren();
-    statusLine("Identificação automática indisponível nesta conversa. O painel não tentará adivinhar o contato.");
+    lookupPhone.value="";
+    contextEl.textContent="Conversa aberta, mas o WhatsApp não forneceu um identificador confiável. Use a busca manual; não faremos associação por nome.";
+    statusLine("Identificação automática indisponível. Os dados da conversa anterior foram limpos.");
   }
 }
 connectBtn.addEventListener("click",async()=>{
