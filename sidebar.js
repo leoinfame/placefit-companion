@@ -8,6 +8,7 @@ const logoutBtn=document.getElementById("logout");
 const lookupPhone=document.getElementById("lookup-phone");
 const lookupBtn=document.getElementById("lookup-button");
 const refreshChatBtn=document.getElementById("refresh-chat");
+const orderOpenBtn=document.getElementById("order-open");
 let currentRecord=null;
 let lastLookupKey="";
 
@@ -295,6 +296,102 @@ function renderCreateContact(phone){
   section.append(form);
   resultEl.append(section);
 }
+function renderOrderComposer(){
+  resultEl.replaceChildren();
+  const c=currentRecord?.conversation||{};
+  const customer=currentRecord?.customer||{};
+  const section=node("section",{class:"order-composer"});
+  section.append(node("h4",{},"Registrar pedido e montar orçamento"));
+  section.append(node("p",{class:"muted"},"Escreva o pedido como recebeu do cliente. A IA organiza os itens e o PlaceFit consulta o catálogo e a tabela de frete. Nada será gravado até sua confirmação."));
+  const form=node("form",{class:"order-composer-form"});
+  const name=addField(form,"Nome do cliente / empresa","name",customer.nome||c.nome_contato||"",{maxlength:200});
+  const phone=addField(form,"WhatsApp com DDD","phone",c.telefone||lookupPhone.value||"",{type:"tel",maxlength:20});
+  const request=addField(form,"Pedido recebido","text","",{multiline:true,rows:6,maxlength:12000});
+  request.placeholder="Ex.: Cliente quer 10 anilhas de 10 kg, 10 de 20 kg e um suporte para 20 pares. Entrega em Campinas/SP. Calcular frete pela tabela.";
+  request.required=true;
+  const submit=node("button",{class:"primary",type:"submit"},"Gerar prévia do orçamento");
+  form.append(submit);
+  form.addEventListener("submit",async event=>{
+    event.preventDefault();
+    const enteredPhone=phone.value.trim().replace(/\D/g,"");
+    if(enteredPhone.length<10||enteredPhone.length>13){statusLine("Informe um telefone válido com DDD.",true);phone.focus();return;}
+    if(!name.value.trim()){statusLine("Informe o nome do cliente.",true);name.focus();return;}
+    if(!request.value.trim()){request.focus();return;}
+    submit.disabled=true;submit.textContent="Interpretando pedido e consultando catálogo...";
+    try{
+      const response=await api({action:"order.preview",conversation_id:c.id||"",phone:enteredPhone,name:name.value.trim(),text:request.value.trim()});
+      if(!response?.ok)throw new Error(response?.data?.message||response?.data?.error||response?.error||"Não foi possível montar a prévia.");
+      renderOrderPreview(response.data,request.value.trim());
+    }catch(error){statusLine(error.message||"Falha ao gerar orçamento.",true);}
+    finally{submit.disabled=false;submit.textContent="Gerar prévia do orçamento";}
+  });
+  section.append(form);
+  resultEl.append(section);
+}
+function renderOrderPreview(data,sourceText){
+  resultEl.replaceChildren();
+  const p=data.preview||{};
+  const section=node("section",{class:"order-preview"});
+  section.append(node("h4",{},"Prévia do orçamento"));
+  section.append(node("p",{class:"muted"},(data.name||p.cliente?.nome||"Cliente") + " · WhatsApp " + (data.phone||"")));
+  if(p.itens?.length){
+    p.itens.forEach(item=>{
+      const line=node("div",{class:"order-line"});
+      const desc=node("div",{});
+      desc.append(node("strong",{},(item.quantidade||0)+" × "+(item.nome||"Produto")));
+      desc.append(node("small",{},(item.cod?"Código "+item.cod+" · ":"")+"Unitário "+money(item.preco_unitario)));
+      line.append(desc,node("strong",{},money(item.subtotal)));
+      section.append(line);
+    });
+  }else{
+    section.append(node("p",{class:"muted"},"Nenhum produto foi associado ao catálogo."));
+  }
+  const totals=node("div",{class:"order-totals"});
+  totals.append(node("span",{},"Subtotal: "+money(p.subtotal)));
+  totals.append(node("span",{},p.frete===null?"Frete: pendente":"Frete ("+(p.frete_origem||"calculado") + "): "+money(p.frete)));
+  totals.append(node("strong",{},p.pronto?"Total: "+money(p.total):"Total ainda não definido"));
+  section.append(totals);
+  const notes=[...(p.perguntas||[]).map(x=>"Pendente: "+x),...(p.nao_cotados||[]).map(x=>"Não cotado: "+x),...(p.suposicoes||[]),...(p.ressalvas||[])];
+  if(notes.length){
+    section.append(node("h4",{},"Conferências e pendências"));
+    const ul=node("ul",{});
+    notes.forEach(note=>ul.append(node("li",{},note)));
+    section.append(ul);
+  }
+  if(p.composicoes?.length){
+    section.append(node("p",{class:"muted"},"Composição: "+p.composicoes.join("; ")));
+  }
+  const actions=node("div",{class:"order-actions"});
+  const back=node("button",{class:"secondary",type:"button"},"Voltar e editar pedido");
+  back.addEventListener("click",renderOrderComposer);
+  actions.append(back);
+  if(p.pronto){
+    const confirm=node("button",{class:"primary confirm-order",type:"button"},"Confirmar e gravar orçamento");
+    confirm.addEventListener("click",async()=>{
+      confirm.disabled=true;confirm.textContent="Gravando orçamento...";
+      try{
+        const saved=await api({action:"order.confirm",conversation_id:data.conversation_id||"",phone:data.phone,name:data.name,text:sourceText,pedido:p.pedido});
+        if(!saved?.ok)throw new Error(saved?.data?.message||saved?.data?.error||saved?.error||"Não foi possível gravar o orçamento.");
+        resultEl.replaceChildren();
+        statusLine("Orçamento "+(saved.data.order?.numero_pedido||"") +" gravado como pendente. Nada foi enviado ao cliente.");
+        const link=document.createElement("a");
+        link.className="order-link";
+        link.href="https://app.placefit.com.br/Orcamentos?abrir="+encodeURIComponent(saved.data.order?.id||"");
+        link.target="_blank";link.rel="noopener noreferrer";
+        link.textContent="Abrir orçamento completo no painel PlaceFit";
+        resultEl.append(link);
+        if(saved.data.divergencias?.length)statusLine("Atenção: confira o orçamento no painel. "+saved.data.divergencias.join("; "),true);
+        if(saved.data.conversation_id)lookupPhone.value=data.phone||"";
+      }catch(error){statusLine(error.message||"Falha ao gravar orçamento.",true);}
+      finally{confirm.disabled=false;confirm.textContent="Confirmar e gravar orçamento";}
+    });
+    actions.append(confirm);
+  }else{
+    actions.append(node("p",{class:"notice"},"Ainda não é possível gravar. Complete as informações pendentes e gere uma nova prévia."));
+  }
+  section.append(actions);
+  resultEl.append(section);
+}
 let lookupSequence=0;
 async function lookup(identifier,source="manual"){
   const isObject=identifier&&typeof identifier==="object";
@@ -390,6 +487,7 @@ logoutBtn.addEventListener("click",async()=>{
   currentRecord=null;lastLookupKey="";resultEl.replaceChildren();
   showAuth(false,"Sessão encerrada neste navegador.");
 });
+orderOpenBtn.addEventListener("click",async()=>{if(!(await checkAuth()))return;renderOrderComposer();});
 lookupBtn.addEventListener("click",async()=>{
   if(!(await checkAuth()))return;
   await lookup(lookupPhone.value);
