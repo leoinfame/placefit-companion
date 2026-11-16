@@ -58,13 +58,13 @@ async function renderMatched(data){
   stageWrap.append(node("span",{},"Etapa do funil"));
   const stageSelect=node("select",{name:"etapa"});
   const fallbackStages=[
-    {chave:"novo",nome:"Novo"},
-    {chave:"atendimento",nome:"Em atendimento"},
+    {chave:"novo",nome:"Novo contato"},
+    {chave:"atendimento",nome:"Atendimento"},
     {chave:"orcamento",nome:"Orçamento"},
     {chave:"aguardando_resposta",nome:"Aguardando resposta"},
     {chave:"negociacao",nome:"Negociação"},
-    {chave:"ganho",nome:"Ganho"},
-    {chave:"perdido",nome:"Perdido"}
+    {chave:"ganho",nome:"Venda ganha"},
+    {chave:"perdido",nome:"Não convertido"}
   ];
   const stages=data.stages?.length?data.stages:fallbackStages;
   stages.forEach(stage=>{
@@ -79,28 +79,12 @@ async function renderMatched(data){
   }
   stageSelect.value=c.etapa||"novo";
   stageWrap.append(stageSelect);form.append(stageWrap);
-  if(!data.stages?.length)form.append(node("p",{class:"muted"},"Etapas padrão disponíveis. A lista personalizada do funil só é exibida para o perfil dono."));
+  if(!data.stages?.length)form.append(node("p",{class:"muted"},"Não foi possível carregar as etapas configuradas do funil. Confira o acesso ao CRM."));
   addField(form,"Observações comerciais","observacoes",c.observacoes,{multiline:true});
   addField(form,"Pendência","pendencia",c.pendencia,{multiline:true,rows:2,maxlength:1000});
 
-  const listSection=node("div",{class:"list-editor"});
-  listSection.append(node("h4",{},"Listas do CRM"));
-  const listChecks=[];
-  const lists=data.lists||[];
-  if(lists.length){
-    const currentLists=new Set(Array.isArray(c.listas)?c.listas:[]);
-    lists.forEach(list=>{
-      const label=node("label",{class:"list-option"});
-      const check=node("input",{type:"checkbox",value:list.id});
-      check.checked=currentLists.has(list.id);
-      const name=node("span",{},list.nome+(list.tipo==="acao"?" · ação":" · segmento"));
-      label.append(check,name);listSection.append(label);
-      listChecks.push(check);
-    });
-  }else{
-    listSection.append(node("p",{class:"muted"},"Nenhuma lista disponível para este usuário."));
-  }
-  form.append(listSection);
+  const funnelHint=node("p",{class:"muted"},"O contato fica em uma única etapa do funil. Segmentos como Fabricante, Distribuidor e Transportador não são etapas comerciais.");
+  form.append(funnelHint);
 
   if(customer){
     const customerDetails=node("details",{class:"contact-details"});
@@ -151,11 +135,7 @@ async function renderMatched(data){
         if(!ur?.ok)throw new Error(ur?.data?.error||ur?.error||"Conversa salva, mas o cadastro do cliente não foi atualizado.");
         currentRecord.customer=ur.data.customer;
       }
-      const selectedListIds=listChecks.filter(check=>check.checked).map(check=>check.value);
-      const lr=await api({action:"conversation.lists.update",conversation_id:c.id,list_ids:selectedListIds});
-      if(!lr?.ok)throw new Error(lr?.data?.error||lr?.error||"Dados salvos, mas as listas não foram atualizadas.");
       currentRecord.conversation=cr.data.conversation;
-      currentRecord.conversation.listas=selectedListIds;
       resultEl.replaceChildren();
       statusLine("Alterações salvas no CRM PlaceFit.");
       renderSaveSummary(currentRecord);
