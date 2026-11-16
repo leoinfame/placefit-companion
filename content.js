@@ -33,10 +33,10 @@ function phoneFromText(value) {
   return null;
 }
 
-function identityFromAttributes(root) {
+function identityFromAttributes(root, includeDescendants = true) {
   if (!root) return null;
   const selector = "[data-id], [data-jid], [data-chat-id], [title], [aria-label], [id]";
-  const nodes = [root, ...root.querySelectorAll(selector)];
+  const nodes = includeDescendants ? [root, ...root.querySelectorAll(selector)] : [root];
   for (const el of nodes) {
     for (const attr of ["data-id", "data-jid", "data-chat-id", "id"]) {
       const found = identityFromJid(el.getAttribute?.(attr));
@@ -64,7 +64,7 @@ function extractChatIdentity() {
   // Não percorre a lista lateral de chats nem os elementos das mensagens.
   const main = document.querySelector("#main");
   if (main) {
-    const fromMainAttributes = identityFromAttributes(main);
+    const fromMainAttributes = identityFromAttributes(main, false);
     if (fromMainAttributes) return fromMainAttributes;
 
     const headers = [
@@ -82,7 +82,7 @@ function extractChatIdentity() {
 
   // Fallback somente para painéis de informação do contato abertos pelo usuário.
   const infoPanels = document.querySelectorAll(
-    '[data-testid="drawer-right"], [data-testid="contact-info-drawer"], [role="dialog"]'
+    '[data-testid="drawer-right"], [data-testid="contact-info-drawer"]'
   );
   for (const panel of infoPanels) {
     const fromAttributes = identityFromAttributes(panel);
