@@ -321,7 +321,7 @@ async function lookup(identifier,source="manual"){
     const data=response.data||{};
     if(data.status==="matched"){renderMatched(data);return;}
     if(data.status==="ambiguous"){statusLine("Encontramos mais de uma conversa com este identificador. Não fizemos associação automática.",true);return;}
-    statusLine("Não foi possível identificar este contato no CRM. Nenhum cadastro foi criado ou associado.");
+    statusLine("Não foi possível identificar este contato. Use a busca manual pelo telefone; não faremos associação por nome.");
     if(!isLid&&wantedPhone.length>=10&&wantedPhone.length<=11)renderCreateContact(clean);
   }catch(error){
     if(sequence!==lookupSequence)return;
