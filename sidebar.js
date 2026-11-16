@@ -100,6 +100,22 @@ function renderMatched(data){
     finally{save.disabled=false;save.textContent="Salvar alterações";}
   });
   resultEl.append(form);
+  renderBudgets(data.budgets || []);
+}
+function money(v){return Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});}
+function renderBudgets(budgets){
+  const section=node("section",{class:"budget-section"});
+  section.append(node("h4",{},"Orçamentos"));
+  if(!budgets.length){section.append(node("p",{class:"muted"},"Nenhum orçamento localizado para este cliente."));resultEl.append(section);return;}
+  budgets.forEach(b=>{
+    const card=node("article",{class:"budget-card"});
+    card.append(node("strong",{},"Orçamento "+(b.numero_pedido||"sem número")));
+    card.append(node("p",{class:"muted"},[b.data_pedido,b.status].filter(Boolean).join(" · ")));
+    (b.itens||[]).forEach(i=>card.append(node("p",{},"• "+(i.quantidade||0)+" × "+(i.nome||"Item")+" — "+money(i.subtotal))));
+    card.append(node("strong",{},"Total: "+money(b.total)));
+    section.append(card);
+  });
+  resultEl.append(section);
 }
 function renderSaveSummary(data){
   const c=data.conversation;
@@ -115,7 +131,7 @@ async function lookup(phone,source="manual"){
   if(key===lastLookupKey&&currentRecord)return;
   lastLookupKey=key;currentRecord=null;
   resultEl.replaceChildren();statusLine("Consultando CRM...");
-  const response=await api({action:"contact.lookup",phone:clean});
+  const response=await api({action:"contact.lookup",...(isLid?{lid:clean}:{phone:clean})});
   resultEl.replaceChildren();
   if(!response?.ok){statusLine(response?.data?.error||response?.error||"Não foi possível consultar o CRM.",true);return;}
   const data=response.data||{};
@@ -150,10 +166,13 @@ async function checkAuth(){
 async function refreshContext(){
   const {activeContext}=await chrome.storage.session.get("activeContext");
   if(!activeContext){contextEl.textContent="Abra uma conversa no WhatsApp Web ou informe o telefone abaixo.";return;}
-  if(activeContext.chatHint){
-    contextEl.textContent="Telefone detectado: "+activeContext.chatHint+".";
-    lookupPhone.value=activeContext.chatHint;
-    if(await checkAuth())await lookup(activeContext.chatHint,"whatsapp");
+  if(activeContext.chatHint||activeContext.lidHint){
+    const identity=activeContext.chatHint?{phone:activeContext.chatHint}:{lid:activeContext.lidHint};
+    contextEl.textContent=activeContext.chatHint?"Conversa ativa · telefone detectado: "+activeContext.chatHint+".":"Conversa ativa · identificador WhatsApp reconhecido (LID).";
+    lookupPhone.value=activeContext.chatHint||"";
+    currentRecord=null;lastLookupKey="";
+    resultEl.replaceChildren();statusLine("Carregando os dados da conversa ativa...");
+    if(await checkAuth())await lookup(identity,"whatsapp");
   }else{
     contextEl.textContent="Conversa aberta, mas o WhatsApp não forneceu um telefone identificável. Use a busca manual; não faremos associação por nome ou LID desconhecido.";
     resultEl.replaceChildren();
