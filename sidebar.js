@@ -1,6 +1,7 @@
 const contextEl=document.getElementById("context");
 const resultEl=document.getElementById("result");
 const statusEl=document.getElementById("status");
+const authCard=document.getElementById("auth-card");
 const authMessage=document.getElementById("auth-message");
 const connectBtn=document.getElementById("connect");
 const logoutBtn=document.getElementById("logout");
@@ -11,10 +12,10 @@ let currentRecord=null;
 let lastLookupKey="";
 
 function showAuth(connected,message){
-  statusEl.textContent=connected?"CONECTADO":"DESCONECTADO";
+  statusEl.textContent=connected?"CRM CONECTADO":"CRM DESCONECTADO";
   statusEl.classList.toggle("online",connected);
   authMessage.textContent=message;
-  connectBtn.classList.toggle("hidden",connected);
+  authCard.classList.toggle("hidden",connected);
   logoutBtn.classList.toggle("hidden",!connected);
 }
 async function api(payload){
@@ -102,16 +103,27 @@ async function renderMatched(data){
   form.append(listSection);
 
   if(customer){
-    form.append(node("h4",{},"Cadastro do cliente"));
-    addField(form,"Nome","customer_nome",customer.nome);
-    addField(form,"E-mail","customer_email",customer.email,{type:"email"});
-    addField(form,"Telefone","customer_telefone",customer.telefone);
-    addField(form,"CPF/CNPJ","customer_cpf_cnpj",customer.cpf_cnpj);
-    addField(form,"Endereço","customer_endereco",customer.endereco,{multiline:true,rows:2});
-    addField(form,"Cidade","customer_cidade",customer.cidade);
-    addField(form,"Estado","customer_estado",customer.estado,{maxlength:2});
-    addField(form,"CEP","customer_cep",customer.cep);
-    addField(form,"Observações do cliente","customer_observacoes",customer.observacoes,{multiline:true});
+    const customerDetails=node("details",{class:"contact-details"});
+    customerDetails.append(node("summary",{},"Dados do contato · ver informações"));
+    const customerFields=node("div",{class:"contact-fields"});
+    customerFields.append(node("p",{class:"muted"},"Cadastro vinculado ao telefone do WhatsApp. Os dados completos ficam recolhidos para manter a tela limpa."));
+    if(customer.idade!==undefined&&customer.idade!==null&&customer.idade!==""){
+      customerFields.append(node("p",{class:"contact-age"},"Idade: "+customer.idade));
+    }
+    addField(customerFields,"Nome","customer_nome",customer.nome);
+    addField(customerFields,"E-mail","customer_email",customer.email,{type:"email"});
+    const phoneNote=node("p",{class:"contact-phone"}, "WhatsApp: "+(customer.telefone||c.telefone||"não informado")+" · identidade principal do contato");
+    customerFields.append(phoneNote);
+    const phoneHidden=node("input",{type:"hidden",name:"customer_telefone",value:customer.telefone||c.telefone||""});
+    customerFields.append(phoneHidden);
+    addField(customerFields,"CPF/CNPJ","customer_cpf_cnpj",customer.cpf_cnpj);
+    addField(customerFields,"Endereço","customer_endereco",customer.endereco,{multiline:true,rows:2});
+    addField(customerFields,"Cidade","customer_cidade",customer.cidade);
+    addField(customerFields,"Estado","customer_estado",customer.estado,{maxlength:2});
+    addField(customerFields,"CEP","customer_cep",customer.cep);
+    addField(customerFields,"Observações do cliente","customer_observacoes",customer.observacoes,{multiline:true});
+    customerDetails.append(customerFields);
+    form.append(customerDetails);
   }else{
     statusLine("O contato foi localizado, mas o cadastro de Cliente não está vinculado ou não está liberado pelas permissões atuais. A edição da conversa continua disponível.");
   }
