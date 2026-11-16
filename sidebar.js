@@ -5,7 +5,8 @@ const authMessage=document.getElementById("auth-message");
 const connectBtn=document.getElementById("connect");
 const logoutBtn=document.getElementById("logout");
 const lookupPhone=document.getElementById("lookup-phone");
-const lookupBtn=document.getElementById("lookup-button");\nconst refreshChatBtn=document.getElementById("refresh-chat");
+const lookupBtn=document.getElementById("lookup-button");
+const refreshChatBtn=document.getElementById("refresh-chat");
 let currentRecord=null;
 let lastLookupKey="";
 
@@ -221,6 +222,45 @@ lookupBtn.addEventListener("click",async()=>{
   if(!(await checkAuth()))return;
   await lookup(lookupPhone.value);
 });
+
+refreshChatBtn.addEventListener("click",async()=>{
+  refreshChatBtn.disabled=true;
+  const originalLabel=refreshChatBtn.textContent;
+  refreshChatBtn.textContent="Lendo conversa...";
+  try{
+    const [tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true});
+    if(!tab?.id||!tab.url?.startsWith("https://web.whatsapp.com/")){
+      resultEl.replaceChildren();
+      statusLine("Abra ou selecione a aba do WhatsApp Web e tente novamente.",true);
+      return;
+    }
+    const response=await chrome.tabs.sendMessage(tab.id,{type:"PLACEFIT_FORCE_CONTEXT_REFRESH"});
+    if(!response?.ok)throw new Error(response?.error||"Não foi possível ler a conversa ativa.");
+    const identity=response.identity||null;
+    lookupSequence++;currentRecord=null;lastLookupKey="";resultEl.replaceChildren();
+    if(identity?.phone){
+      lookupPhone.value=identity.phone;
+      contextEl.textContent="Leitura manual da conversa · telefone detectado: "+identity.phone;
+      if(await checkAuth())await lookup({phone:identity.phone},"manual-refresh");
+    }else if(identity?.lid){
+      lookupPhone.value="";
+      contextEl.textContent="Leitura manual da conversa · identificador WhatsApp (LID) reconhecido.";
+      if(await checkAuth())await lookup({lid:identity.lid},"manual-refresh");
+    }else{
+      lookupPhone.value="";
+      contextEl.textContent="Conversa aberta, mas não foi encontrado telefone ou identificador confiável.";
+      statusLine("Não foi possível identificar este contato. Use a busca manual pelo telefone; não faremos associação por nome.");
+    }
+  }catch(error){
+    resultEl.replaceChildren();
+    const message=error?.message||"Falha ao atualizar a conversa.";
+    statusLine(message.includes("Receiving end does not exist")?"O WhatsApp ainda está com o script antigo. Feche a aba e abra o WhatsApp Web novamente.":message,true);
+  }finally{
+    refreshChatBtn.disabled=false;
+    refreshChatBtn.textContent=originalLabel;
+  }
+});
+
 lookupPhone.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();lookupBtn.click();}});
 chrome.storage.onChanged.addListener((changes,area)=>{
   if(area!=="session")return;
