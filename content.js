@@ -33,12 +33,20 @@ function publishContext() {
   const key = identity ? JSON.stringify(identity) : "";
   if (key === lastContextKey) return;
   lastContextKey = key;
-  chrome.runtime.sendMessage({
-    type: "PLACEFIT_CONTEXT",
-    chatHint: identity?.phone || null,
-    lidHint: identity?.lid || null,
-    contextKey: key
-  }).catch(() => {});
+  // Após recarregar a extensão, o contexto antigo desta aba pode ser invalidado.
+  // O try/catch captura também erros síncronos (que .catch() não captura).
+  try {
+    if (!chrome.runtime?.id) return;
+    const pending = chrome.runtime.sendMessage({
+      type: "PLACEFIT_CONTEXT",
+      chatHint: identity?.phone || null,
+      lidHint: identity?.lid || null,
+      contextKey: key
+    });
+    pending?.catch?.(() => {});
+  } catch (_) {
+    // A aba precisa ser recarregada para receber um novo content script.
+  }
 }
 
 function schedulePublish() {
