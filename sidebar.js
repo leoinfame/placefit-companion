@@ -249,6 +249,59 @@ function renderSaveSummary(data){
   edit.addEventListener("click",()=>renderMatched(data));
   resultEl.append(edit);
 }
+function renderCreateContact(phone){
+  const section=node("section",{class:"create-contact"});
+  section.append(node("h4",{},"Cadastrar contato no CRM"));
+  section.append(node("p",{class:"muted"},"Este telefone ainda não está cadastrado. Informe o nome para criar o contato e vincular esta conversa."));
+  const form=node("form",{class:"create-contact-form"});
+  const nameInput=node("input",{type:"text",placeholder:"Nome do cliente",maxlength:200});
+  nameInput.required=true;
+  nameInput.autocomplete="name";
+  const phoneInput=node("input",{type:"tel",value:phone});
+  phoneInput.readOnly=true;
+  phoneInput.setAttribute("aria-label","Telefone identificado no WhatsApp");
+  const phoneLabel=node("label",{class:"edit-field"});
+  phoneLabel.append(node("span",{},"Telefone WhatsApp"));
+  phoneLabel.append(phoneInput);
+  const nameLabel=node("label",{class:"edit-field"});
+  nameLabel.append(node("span",{},"Nome do contato"));
+  nameLabel.append(nameInput);
+  form.append(phoneLabel,nameLabel);
+  const submit=node("button",{class:"primary",type:"submit"},"Cadastrar este contato");
+  form.append(submit);
+  form.addEventListener("submit",async event=>{
+    event.preventDefault();
+    const name=nameInput.value.trim();
+    if(!name){nameInput.focus();return;}
+    submit.disabled=true;submit.textContent="Cadastrando...";
+    try{
+      const response=await api({action:"contact.create",phone,name});
+      if(!response?.ok){
+        const code=response?.data?.error||response?.error||"CREATE_FAILED";
+        if(code==="CONVERSATION_ALREADY_EXISTS"){
+          statusLine("Já existe uma conversa com este telefone. Atualize a conversa para carregar o cadastro.",true);
+        }else if(code==="CUSTOMER_DUPLICATE"){
+          statusLine("Há mais de um cadastro com este telefone. É necessário resolver a duplicidade antes de criar outro.",true);
+        }else if(code==="FORBIDDEN"){
+          statusLine("Seu perfil não tem permissão para cadastrar contatos. Peça ao responsável pelo CRM.",true);
+        }else{
+          statusLine("Não foi possível cadastrar o contato: "+code,true);
+        }
+        return;
+      }
+      resultEl.replaceChildren();
+      statusLine("Contato cadastrado e conversa vinculada ao telefone do WhatsApp.");
+      lastLookupKey="";
+      await lookup(phone,"created");
+    }catch(error){
+      statusLine(error?.message||"Falha ao cadastrar o contato.",true);
+    }finally{
+      submit.disabled=false;submit.textContent="Cadastrar este contato";
+    }
+  });
+  section.append(form);
+  resultEl.append(section);
+}
 let lookupSequence=0;
 async function lookup(identifier,source="manual"){
   const isObject=identifier&&typeof identifier==="object";
@@ -268,7 +321,8 @@ async function lookup(identifier,source="manual"){
     const data=response.data||{};
     if(data.status==="matched"){renderMatched(data);return;}
     if(data.status==="ambiguous"){statusLine("Encontramos mais de uma conversa com este identificador. Não fizemos associação automática.",true);return;}
-    statusLine("Nenhuma conversa correspondente encontrada no CRM. Nenhum contato foi criado ou associado.");
+    statusLine("Não foi possível identificar este contato no CRM. Nenhum cadastro foi criado ou associado.");
+    if(!isLid&&wantedPhone.length>=10&&wantedPhone.length<=11)renderCreateContact(clean);
   }catch(error){
     if(sequence!==lookupSequence)return;
     resultEl.replaceChildren();statusLine(error?.message||"Falha ao consultar o CRM.",true);
