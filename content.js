@@ -89,7 +89,18 @@ function publishContext() {
   }
 }
 
-// Permite ao painel solicitar uma nova leitura sob demanda, sem depender do observer.\nchrome.runtime.onMessage.addListener((message, sender, sendResponse) => {\n  if (message?.type !== "PLACEFIT_FORCE_CONTEXT_REFRESH") return false;\n  try {\n    sendResponse({ ok: true, identity: extractChatIdentity() });\n  } catch (error) {\n    sendResponse({ ok: false, error: error?.message || "IDENTITY_READ_FAILED" });\n  }\n  return false;\n});\n\nfunction schedulePublish() {
+// Permite ao painel solicitar uma nova leitura sob demanda, sem depender do observer.
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type !== "PLACEFIT_FORCE_CONTEXT_REFRESH") return false;
+  try {
+    sendResponse({ ok: true, identity: extractChatIdentity() });
+  } catch (error) {
+    sendResponse({ ok: false, error: error?.message || "IDENTITY_READ_FAILED" });
+  }
+  return false;
+});
+
+function schedulePublish() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(publishContext, 180);
 }
