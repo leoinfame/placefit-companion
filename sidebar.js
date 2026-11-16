@@ -274,7 +274,7 @@ function renderCreateContact(phone){
     event.preventDefault();
     const name=nameInput.value.trim();
     const enteredPhone=phoneInput.value.trim();
-    const normalizedPhone=enteredPhone.replace(/\\D/g,"");
+    const normalizedPhone=enteredPhone.replace(/\D/g,"");
     if(!name){nameInput.focus();return;}
     if(normalizedPhone.length<10||normalizedPhone.length>13){phoneInput.focus();statusLine("Informe um telefone válido com DDD e código do país, se necessário.",true);return;}
     submit.disabled=true;submit.textContent="Cadastrando...";
@@ -312,7 +312,7 @@ async function lookup(identifier,source="manual"){
   const isLid=isObject&&Boolean(identifier.lid);
   const clean=String(isObject?(identifier.phone||identifier.lid||""):identifier||"").trim();
   if(!clean){resultEl.replaceChildren();statusLine("Informe um telefone com DDD para pesquisar.",true);return;}
-  const key=(isLid?"lid:":"phone:")+clean.replace(/\\D/g,"");
+  const key=(isLid?"lid:":"phone:")+clean.replace(/\D/g,"");
   if(key===lastLookupKey&&currentRecord)return;
   lastLookupKey=key;currentRecord=null;
   const sequence=++lookupSequence;
@@ -326,7 +326,7 @@ async function lookup(identifier,source="manual"){
     if(data.status==="matched"){renderMatched(data);return;}
     if(data.status==="ambiguous"){statusLine("Encontramos mais de uma conversa com este identificador. Não fizemos associação automática.",true);return;}
     statusLine("Não foi possível identificar este contato. Use a busca manual pelo telefone; não faremos associação por nome.");
-    renderCreateContact(!isLid&&clean.replace(/\\D/g,"").length>=10&&clean.replace(/\\D/g,"").length<=11?clean:"");
+    renderCreateContact(!isLid&&clean.replace(/\D/g,"").length>=10&&clean.replace(/\D/g,"").length<=11?clean:"");
   }catch(error){
     if(sequence!==lookupSequence)return;
     resultEl.replaceChildren();statusLine(error?.message||"Falha ao consultar o CRM.",true);
