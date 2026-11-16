@@ -1,13 +1,40 @@
 {
   "manifest_version": 3,
   "name": "PlaceFit Companion",
-  "version": "0.2.2",
+  "version": "0.4.1",
   "description": "Painel lateral do CRM PlaceFit no WhatsApp Web.",
-  "permissions": ["sidePanel", "storage", "tabs"],
-  "host_permissions": ["https://web.whatsapp.com/*","https://preview-sandbox--68c9d5dd3cf0f8fd8a834875.base44.app/*"],
-  "externally_connectable": {"matches":["https://preview-sandbox--68c9d5dd3cf0f8fd8a834875.base44.app/*"]},
-  "background": {"service_worker":"background.js"},
-  "action": {"default_title":"Abrir PlaceFit Companion"},
-  "content_scripts": [{"matches":["https://web.whatsapp.com/*"],"js":["content.js"],"run_at":"document_idle"}],
-  "side_panel": {"default_path":"sidebar.html"}
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://placefit.base44.app/*"
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://placefit.base44.app/*"
+    ]
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Abrir PlaceFit Companion"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidebar.html"
+  }
 }

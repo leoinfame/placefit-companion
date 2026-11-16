@@ -1,11 +1,10 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PlaceFit Companion</title><link rel="stylesheet" href="sidebar.css"></head>
 <body>
-<header class="topbar"><div class="brand-mark">P</div><div><strong>PlaceFit</strong><small>COMPANION</small></div><span class="status" id="status">DESCONECTADO</span></header>
+<header class="topbar"><div class="brand-mark">P</div><div class="brand-copy"><strong>PlaceFit</strong><small>COMPANION</small></div><span class="status" id="status">DESCONECTADO</span><button id="logout" class="top-logout hidden" title="Desconectar do CRM">Sair</button></header>
 <main>
-<section class="welcome"><p class="eyebrow">CRM CONECTADO AO WHATSAPP</p><h1>Atendimento com contexto.</h1><p>Consulte e edite os dados autorizados do CRM sem sair da conversa.</p></section>
-<section class="card"><h2>Acesso ao CRM</h2><p class="muted" id="auth-message">Conecte sua conta PlaceFit para habilitar as consultas.</p><button id="connect" class="primary">Entrar com PlaceFit</button><button id="logout" class="secondary hidden">Desconectar</button></section>
-<section class="card"><div class="section-head"><h2>Contato atual</h2><span class="dot"></span></div><div id="context" class="muted">Abra uma conversa no WhatsApp Web ou informe o telefone abaixo.</div><div class="lookup-row"><input id="lookup-phone" type="tel" inputmode="tel" placeholder="Telefone com DDD" aria-label="Telefone com DDD"><button id="lookup-button" class="primary">Buscar</button></div><div id="result" class="result"></div></section>
-<section class="card"><h2>Como a identificação funciona</h2><ul><li>Telefone com correspondência única: abre o cadastro.</li><li>Duplicidade: não associa automaticamente.</li><li>LID sem vínculo confiável: fica fora da busca automática.</li><li>Edição respeita as permissões do CRM.</li></ul></section>
-<footer>PlaceFit Companion · MVP 0.3.0</footer>
+<section class="card auth-card" id="auth-card"><h2>Acesso ao CRM</h2><p class="muted" id="auth-message">Conecte sua conta PlaceFit para habilitar as consultas.</p><button id="connect" class="primary">Entrar com PlaceFit</button></section>
+<section class="card contact-card"><div class="section-head"><h2>Contato atual</h2><span class="dot"></span></div><div id="context" class="muted">Abra uma conversa no WhatsApp Web ou informe o telefone abaixo.</div><button id="refresh-chat" class="secondary refresh-button">↻ Atualizar conversa</button><div class="lookup-row"><input id="lookup-phone" type="tel" inputmode="tel" placeholder="Telefone com DDD" aria-label="Telefone com DDD"><button id="lookup-button" class="primary">Buscar</button></div><button id="order-open" class="secondary order-open">＋ Registrar pedido e gerar orçamento</button><div id="result" class="result"></div></section>
+<details class="help-details"><summary>Como funciona a identificação</summary><ul><li>Telefone com correspondência única: abre o cadastro.</li><li>Duplicidade: não associa automaticamente.</li><li>LID sem vínculo confiável: fica fora da busca automática.</li><li>Edição respeita as permissões do CRM.</li></ul></details>
+<footer>PlaceFit Companion · MVP 0.4.0</footer>
 </main><script src="sidebar.js"></script></body></html>
