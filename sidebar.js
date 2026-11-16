@@ -5,7 +5,7 @@ const authMessage=document.getElementById("auth-message");
 const connectBtn=document.getElementById("connect");
 const logoutBtn=document.getElementById("logout");
 const lookupPhone=document.getElementById("lookup-phone");
-const lookupBtn=document.getElementById("lookup-button");
+const lookupBtn=document.getElementById("lookup-button");\nconst refreshChatBtn=document.getElementById("refresh-chat");
 let currentRecord=null;
 let lastLookupKey="";
 
