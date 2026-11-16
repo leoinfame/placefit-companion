@@ -9,10 +9,10 @@ function normalizePhone(value) {
 }
 
 function phoneFromText(value) {
-  const text = String(value || "").replace(/[\\u00a0\\u202f]/g, " ");
+  const text = String(value || "").replace(/[\u00a0\u202f]/g, " ");
   // Primeiro reconhece números brasileiros com DDI opcional, DDD e número local.
   // A busca é limitada ao cabeçalho ativo ou ao painel de informações; nunca às mensagens.
-  const brazilian = text.match(/(?:\\+?55[\\s().-]*)?(?:\\(?\\d{2}\\)?[\\s().-]*)?(?:9?\\d{4})[\\s.-]?\\d{4}/g) || [];
+  const brazilian = text.match(/(?:\+?55[\s().-]*)?(?:\(?\d{2}\)?[\s().-]*)?(?:9?\d{4})[\s.-]?\d{4}/g) || [];
   for (const candidate of brazilian) {
     const phone = normalizePhone(candidate);
     if (phone && (phone.length === 10 || phone.length === 11 || phone.length === 12 || phone.length === 13)) {
@@ -20,7 +20,7 @@ function phoneFromText(value) {
     }
   }
   // Fallback para números internacionais apresentados com separadores variados.
-  const candidates = text.match(/\\+?\\d(?:[\\d\\s().-]*\\d)?/g) || [];
+  const candidates = text.match(/\+?\d(?:[\d\s().-]*\d)?/g) || [];
   for (const candidate of candidates) {
     const phone = normalizePhone(candidate);
     if (phone) return phone;
