@@ -1,33 +1,54 @@
-// Captura somente o telefone quando o próprio WhatsApp o expõe na rota /send?phone=.
-// Não lê mensagens, nomes, atributos do DOM nem tenta adivinhar identificadores LID.
-let lastHref = location.href;
+// Detecta somente identificadores estruturais do chat ativo; nunca lê mensagens.
+let lastContextKey = "";
+let debounceTimer;
 
-function publishContext() {
-  const current = location.href;
-  if (current === lastHref && document.visibilityState !== "visible") return;
-  lastHref = current;
-
-  let chatHint = null;
-  try {
-    const url = new URL(current);
-    if (url.pathname.replace(/\/$/, "").endsWith("/send")) {
-      const phone = url.searchParams.get("phone");
-      if (phone && /^[+\d\s().-]{10,24}$/.test(phone)) chatHint = phone;
-    }
-  } catch (_) {
-    // URL inválida: não publica identificador.
+function extractChatIdentity() {
+  const url = new URL(location.href);
+  if (url.pathname.replace(/\/$/, "").endsWith("/send")) {
+    const phone = url.searchParams.get("phone");
+    if (phone && /^[+\d\s().-]{10,24}$/.test(phone)) return { phone };
   }
 
+  // O WhatsApp usa IDs estruturais no cabeçalho ativo. Só aceitamos
+  // formatos conhecidos: número @c.us ou LID @lid. Nome não é chave.
+  const header = document.querySelector('[data-testid="conversation-info-header"], header');
+  if (header) {
+    const nodes = [header, ...header.querySelectorAll("[data-id], [data-jid], [data-chat-id]")];
+    for (const el of nodes) {
+      for (const attr of ["data-id", "data-jid", "data-chat-id"]) {
+        const raw = el.getAttribute?.(attr) || "";
+        const phoneMatch = raw.match(/(?:^|[^\d])(\d{10,15})@c\.us$/i);
+        if (phoneMatch) return { phone: phoneMatch[1] };
+        const lidMatch = raw.match(/^(\d{5,30})@lid$/i);
+        if (lidMatch) return { lid: lidMatch[1] };
+      }
+    }
+  }
+  return null;
+}
+
+function publishContext() {
+  let identity = null;
+  try { identity = extractChatIdentity(); } catch (_) {}
+  const key = identity ? JSON.stringify(identity) : "";
+  if (key === lastContextKey) return;
+  lastContextKey = key;
   chrome.runtime.sendMessage({
     type: "PLACEFIT_CONTEXT",
-    chatHint
+    chatHint: identity?.phone || null,
+    lidHint: identity?.lid || null,
+    contextKey: key
   }).catch(() => {});
 }
 
-const observer = new MutationObserver(() => {
-  if (location.href !== lastHref) publishContext();
-});
-observer.observe(document.documentElement, { childList: true, subtree: true });
-window.addEventListener("popstate", publishContext);
-document.addEventListener("visibilitychange", publishContext);
+function schedulePublish() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(publishContext, 180);
+}
+
+const observer = new MutationObserver(schedulePublish);
+observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-id", "data-jid", "data-chat-id"] });
+window.addEventListener("popstate", schedulePublish);
+window.addEventListener("hashchange", schedulePublish);
+document.addEventListener("visibilitychange", schedulePublish);
 publishContext();
