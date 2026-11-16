@@ -14,7 +14,7 @@ chrome.runtime.onMessageExternal.addListener((message,sender,sendResponse) => {
 });
 chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if(message?.type==="PLACEFIT_CONTEXT"){
-    chrome.storage.session.set({activeContext:{url:sender.tab?.url||"",chatHint:message.chatHint||null,capturedAt:Date.now()}}).then(()=>sendResponse({ok:true})).catch(e=>sendResponse({ok:false,error:e?.message||"CONTEXT_STORAGE_FAILED"}));return true;
+    chrome.storage.session.set({activeContext:{url:sender.tab?.url||"",chatHint:message.chatHint||null,lidHint:message.lidHint||null,contextKey:message.contextKey||"",capturedAt:Date.now()}}).then(()=>sendResponse({ok:true})).catch(e=>sendResponse({ok:false,error:e?.message||"CONTEXT_STORAGE_FAILED"}));return true;
   }
   if(message?.type==="PLACEFIT_OPEN_AUTH"){
     const url="https://preview-sandbox--68c9d5dd3cf0f8fd8a834875.base44.app/CompanionAuth?extensionId="+encodeURIComponent(chrome.runtime.id);
