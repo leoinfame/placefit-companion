@@ -283,7 +283,16 @@ function renderCreateContact(phone){
       if(!response?.ok){
         const code=response?.data?.error||response?.error||"CREATE_FAILED";
         if(code==="CONVERSATION_ALREADY_EXISTS"){
-          statusLine("Já existe uma conversa com este telefone. Atualize a conversa para carregar o cadastro.",true);
+          submit.textContent="Localizando cadastro...";
+          const existing=await api({action:"contact.lookup",phone:normalizedPhone});
+          if(existing?.ok&&existing.data?.status==="matched"){
+            lastLookupKey="phone:"+normalizedPhone;
+            await renderMatched(existing.data);
+          }else if(existing?.ok&&existing.data?.status==="ambiguous"){
+            statusLine("Há mais de uma conversa com este telefone. Não fizemos associação automática; é necessário resolver a duplicidade no CRM.",true);
+          }else{
+            statusLine("A conversa já existe no CRM, mas não foi possível carregar um cadastro correspondente por telefone. Atualize a conversa ou confira o cadastro no PlaceFit.",true);
+          }
         }else if(code==="CUSTOMER_DUPLICATE"){
           statusLine("Há mais de um cadastro com este telefone. É necessário resolver a duplicidade antes de criar outro.",true);
         }else if(code==="FORBIDDEN"){
