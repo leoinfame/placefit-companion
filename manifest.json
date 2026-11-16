@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PlaceFit Companion",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Painel lateral do CRM PlaceFit no WhatsApp Web.",
   "permissions": ["sidePanel", "storage", "tabs"],
   "host_permissions": ["https://web.whatsapp.com/*","https://preview-sandbox--68c9d5dd3cf0f8fd8a834875.base44.app/*"],
