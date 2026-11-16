@@ -8,39 +8,45 @@ function normalizePhone(value) {
   return digits;
 }
 
+function identityFromJid(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  // O WhatsApp Web pode prefixar JIDs com true_/false_ e incluir
+  // o identificador do dispositivo (:N). O LID também pode vir assim.
+  const lid = raw.match(/(?:^|[^0-9])(?:true_|false_)?(\d{5,30})(?::\d+)?@lid(?:$|[^a-z])/i);
+  if (lid) return { lid: lid[1] };
+
+  const phone = raw.match(/(?:^|[^0-9])(?:true_|false_)?(\d{10,15})(?::\d+)?@(?:c\.us|s\.whatsapp\.net)(?:$|[^a-z])/i);
+  if (phone) return { phone: phone[1] };
+  return null;
+}
+
 function phoneFromText(value) {
   const text = String(value || "").replace(/[\u00a0\u202f]/g, " ");
-  // Primeiro reconhece números brasileiros com DDI opcional, DDD e número local.
-  // A busca é limitada ao cabeçalho ativo ou ao painel de informações; nunca às mensagens.
+  // Só tenta números apresentados no cabeçalho ativo ou painel de informações.
   const brazilian = text.match(/(?:\+?55[\s().-]*)?(?:\(?\d{2}\)?[\s().-]*)?(?:9?\d{4})[\s.-]?\d{4}/g) || [];
   for (const candidate of brazilian) {
     const phone = normalizePhone(candidate);
-    if (phone && (phone.length === 10 || phone.length === 11 || phone.length === 12 || phone.length === 13)) {
-      return phone;
-    }
-  }
-  // Fallback para números internacionais apresentados com separadores variados.
-  const candidates = text.match(/\+?\d(?:[\d\s().-]*\d)?/g) || [];
-  for (const candidate of candidates) {
-    const phone = normalizePhone(candidate);
-    if (phone) return phone;
+    if (phone && [10, 11, 12, 13].includes(phone.length)) return phone;
   }
   return null;
 }
 
 function identityFromAttributes(root) {
   if (!root) return null;
-  const nodes = [root, ...root.querySelectorAll("[data-id], [data-jid], [data-chat-id], [title], [aria-label]")];
+  const selector = "[data-id], [data-jid], [data-chat-id], [title], [aria-label], [id]";
+  const nodes = [root, ...root.querySelectorAll(selector)];
   for (const el of nodes) {
-    for (const attr of ["data-id", "data-jid", "data-chat-id"]) {
-      const raw = el.getAttribute?.(attr) || "";
-      const phoneMatch = raw.match(/(?:^|[^\d])(\d{10,15})@c\.us$/i);
-      if (phoneMatch) return { phone: phoneMatch[1] };
-      const lidMatch = raw.match(/^(\d{5,30})@lid$/i);
-      if (lidMatch) return { lid: lidMatch[1] };
+    for (const attr of ["data-id", "data-jid", "data-chat-id", "id"]) {
+      const found = identityFromJid(el.getAttribute?.(attr));
+      if (found) return found;
     }
     for (const attr of ["title", "aria-label"]) {
-      const phone = phoneFromText(el.getAttribute?.(attr));
+      const value = el.getAttribute?.(attr) || "";
+      const found = identityFromJid(value);
+      if (found) return found;
+      const phone = phoneFromText(value);
       if (phone) return { phone };
     }
   }
@@ -54,23 +60,30 @@ function extractChatIdentity() {
     if (phone) return { phone };
   }
 
-  // O WhatsApp pode expor o número como texto/atributo acessível no cabeçalho.
-  // Inclui tanto <header> quanto contêineres com role=banner. O WhatsApp
-  // já apresentou o telefone somente como texto visível do cabeçalho.
-  const headers = [
-    ...document.querySelectorAll("header"),
-    ...document.querySelectorAll('[role="banner"]')
-  ];
-  for (const header of [...new Set(headers)]) {
-    const fromAttributes = identityFromAttributes(header);
-    if (fromAttributes) return fromAttributes;
-    const fromVisibleHeader = phoneFromText(header.innerText || header.textContent);
-    if (fromVisibleHeader) return { phone: fromVisibleHeader };
+  // Ancora a identidade no painel principal da conversa selecionada.
+  // Não percorre a lista lateral de chats nem os elementos das mensagens.
+  const main = document.querySelector("#main");
+  if (main) {
+    const fromMainAttributes = identityFromAttributes(main);
+    if (fromMainAttributes) return fromMainAttributes;
+
+    const headers = [
+      ...main.querySelectorAll("header"),
+      ...main.querySelectorAll('[data-testid="conversation-info-header"]'),
+      ...main.querySelectorAll('[data-testid="conversation-header"]')
+    ];
+    for (const header of [...new Set(headers)]) {
+      const fromAttributes = identityFromAttributes(header);
+      if (fromAttributes) return fromAttributes;
+      const fromVisibleHeader = phoneFromText(header.innerText || header.textContent);
+      if (fromVisibleHeader) return { phone: fromVisibleHeader };
+    }
   }
 
-  // Fallback: painel de informações do contato, se estiver aberto.
-  // Não varre a lista de conversas nem o conteúdo das mensagens.
-  const infoPanels = document.querySelectorAll('[role="dialog"], [role="complementary"], aside');
+  // Fallback somente para painéis de informação do contato abertos pelo usuário.
+  const infoPanels = document.querySelectorAll(
+    '[data-testid="drawer-right"], [data-testid="contact-info-drawer"], [role="dialog"]'
+  );
   for (const panel of infoPanels) {
     const fromAttributes = identityFromAttributes(panel);
     if (fromAttributes) return fromAttributes;
@@ -100,7 +113,7 @@ function publishContext() {
   }
 }
 
-// Permite ao painel solicitar uma nova leitura sob demanda, sem depender do observer.
+// Permite ao painel solicitar nova leitura sob demanda.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "PLACEFIT_FORCE_CONTEXT_REFRESH") return false;
   try {
@@ -121,7 +134,7 @@ observer.observe(document.documentElement, {
   childList: true,
   subtree: true,
   attributes: true,
-  attributeFilter: ["data-id", "data-jid", "data-chat-id", "title", "aria-label"]
+  attributeFilter: ["data-id", "data-jid", "data-chat-id", "title", "aria-label", "data-testid", "id"]
 });
 window.addEventListener("popstate", schedulePublish);
 window.addEventListener("hashchange", schedulePublish);
