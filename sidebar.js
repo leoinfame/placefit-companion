@@ -197,14 +197,35 @@ async function renderMatched(data){
 function money(v){return Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});}
 function renderBudgets(budgets){
   const section=node("section",{class:"budget-section"});
-  section.append(node("h4",{},"Orçamentos"));
-  if(!budgets.length){section.append(node("p",{class:"muted"},"Nenhum orçamento localizado para este cliente."));resultEl.append(section);return;}
+  section.append(node("h4",{},"Orçamentos do cliente"));
+  if(!budgets.length){
+    section.append(node("p",{class:"muted"},"Nenhum orçamento vinculado a este cadastro."));
+    resultEl.append(section);return;
+  }
   budgets.forEach(b=>{
     const card=node("article",{class:"budget-card"});
     card.append(node("strong",{},"Orçamento "+(b.numero_pedido||"sem número")));
     card.append(node("p",{class:"muted"},[b.data_pedido,b.status].filter(Boolean).join(" · ")));
-    (b.itens||[]).forEach(i=>card.append(node("p",{},"• "+(i.quantidade||0)+" × "+(i.nome||"Item")+" — "+money(i.subtotal))));
-    card.append(node("strong",{},"Total: "+money(b.total)));
+    (b.itens||[]).forEach(i=>{
+      const line=node("div",{class:"budget-item"});
+      line.append(node("span",{},(i.quantidade||0)+" × "+(i.nome||"Item")));
+      line.append(node("span",{},money(i.subtotal)));
+      card.append(line);
+      if(i.preco_unitario)card.append(node("p",{class:"muted"},"Unitário: "+money(i.preco_unitario)+" · Código: "+(i.cod||"—")));
+    });
+    const totals=node("div",{class:"budget-totals"});
+    totals.append(node("span",{},"Subtotal: "+money(b.subtotal)));
+    totals.append(node("span",{},"Frete: "+money(b.frete)));
+    totals.append(node("span",{},"Desconto: "+money(b.desconto)));
+    totals.append(node("strong",{},"Total: "+money(b.total)));
+    card.append(totals);
+    if(b.observacoes)card.append(node("p",{class:"muted"},"Obs.: "+b.observacoes));
+    const open=document.createElement("a");
+    open.className="secondary budget-open";
+    open.href="https://app.placefit.com.br/Orcamentos?abrir="+encodeURIComponent(b.id);
+    open.target="_blank";open.rel="noopener noreferrer";
+    open.textContent="Abrir orçamento completo no PlaceFit";
+    card.append(open);
     section.append(card);
   });
   resultEl.append(section);
