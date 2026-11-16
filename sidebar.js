@@ -43,18 +43,64 @@ function statusLine(text,isError=false){
   const p=node("p",{class:isError?"notice error":"notice"},text);
   resultEl.append(p);
 }
-function renderMatched(data){
+async function renderMatched(data){
   currentRecord=data;
   resultEl.replaceChildren();
   const c=data.conversation, customer=data.customer;
   resultEl.append(node("h3",{},c.nome_contato||"Contato localizado"));
   resultEl.append(node("p",{class:"muted"},"Correspondência por "+(data.matched_by==="lid"?"identificador WhatsApp associado":"telefone")+" · etapa: "+(c.etapa||"novo")));
+
   const form=node("form",{class:"edit-form"});
   form.append(node("h4",{},"Dados da conversa"));
   addField(form,"Nome exibido","nome_contato",c.nome_contato,{maxlength:200});
-  addField(form,"Etapa do funil","etapa",c.etapa,{maxlength:60});
+  const stageWrap=node("label",{class:"edit-field"});
+  stageWrap.append(node("span",{},"Etapa do funil"));
+  const stageSelect=node("select",{name:"etapa"});
+  const fallbackStages=[
+    {chave:"novo",nome:"Novo"},
+    {chave:"atendimento",nome:"Em atendimento"},
+    {chave:"orcamento",nome:"Orçamento"},
+    {chave:"aguardando_resposta",nome:"Aguardando resposta"},
+    {chave:"negociacao",nome:"Negociação"},
+    {chave:"ganho",nome:"Ganho"},
+    {chave:"perdido",nome:"Perdido"}
+  ];
+  const stages=data.stages?.length?data.stages:fallbackStages;
+  stages.forEach(stage=>{
+    const option=node("option",{},stage.nome||stage.chave);
+    option.value=stage.chave;
+    stageSelect.append(option);
+  });
+  if(!stages.some(s=>s.chave===c.etapa)){
+    const option=node("option",{},c.etapa||"Etapa atual");
+    option.value=c.etapa||"novo";
+    stageSelect.append(option);
+  }
+  stageSelect.value=c.etapa||"novo";
+  stageWrap.append(stageSelect);form.append(stageWrap);
+  if(!data.stages?.length)form.append(node("p",{class:"muted"},"Etapas padrão disponíveis. A lista personalizada do funil só é exibida para o perfil dono."));
   addField(form,"Observações comerciais","observacoes",c.observacoes,{multiline:true});
   addField(form,"Pendência","pendencia",c.pendencia,{multiline:true,rows:2,maxlength:1000});
+
+  const listSection=node("div",{class:"list-editor"});
+  listSection.append(node("h4",{},"Listas do CRM"));
+  const listChecks=[];
+  const lists=data.lists||[];
+  if(lists.length){
+    const currentLists=new Set(Array.isArray(c.listas)?c.listas:[]);
+    lists.forEach(list=>{
+      const label=node("label",{class:"list-option"});
+      const check=node("input",{type:"checkbox",value:list.id});
+      check.checked=currentLists.has(list.id);
+      const name=node("span",{},list.nome+(list.tipo==="acao"?" · ação":" · segmento"));
+      label.append(check,name);listSection.append(label);
+      listChecks.push(check);
+    });
+  }else{
+    listSection.append(node("p",{class:"muted"},"Nenhuma lista disponível para este usuário."));
+  }
+  form.append(listSection);
+
   if(customer){
     form.append(node("h4",{},"Cadastro do cliente"));
     addField(form,"Nome","customer_nome",customer.nome);
@@ -93,7 +139,11 @@ function renderMatched(data){
         if(!ur?.ok)throw new Error(ur?.data?.error||ur?.error||"Conversa salva, mas o cadastro do cliente não foi atualizado.");
         currentRecord.customer=ur.data.customer;
       }
+      const selectedListIds=listChecks.filter(check=>check.checked).map(check=>check.value);
+      const lr=await api({action:"conversation.lists.update",conversation_id:c.id,list_ids:selectedListIds});
+      if(!lr?.ok)throw new Error(lr?.data?.error||lr?.error||"Dados salvos, mas as listas não foram atualizadas.");
       currentRecord.conversation=cr.data.conversation;
+      currentRecord.conversation.listas=selectedListIds;
       resultEl.replaceChildren();
       statusLine("Alterações salvas no CRM PlaceFit.");
       renderSaveSummary(currentRecord);
@@ -102,6 +152,47 @@ function renderMatched(data){
   });
   resultEl.append(form);
   renderBudgets(data.budgets || []);
+
+  const stepsSection=node("section",{class:"next-steps"});
+  stepsSection.append(node("h4",{},"Próximos passos"));
+  const steps=data.next_steps||[];
+  if(steps.length){
+    steps.forEach(step=>{
+      const item=node("div",{class:"next-step-item"});
+      item.append(node("strong",{},step.descricao));
+      const meta=[step.em?new Date(step.em).toLocaleString("pt-BR"):"",step.por].filter(Boolean).join(" · ");
+      if(meta)item.append(node("p",{class:"muted"},meta));
+      stepsSection.append(item);
+    });
+  }else{
+    stepsSection.append(node("p",{class:"muted"},data.can_manage_next_steps?"Nenhum próximo passo registrado.":"O histórico de próximos passos é restrito ao dono do CRM."));
+  }
+  if(data.can_manage_next_steps){
+    const stepForm=node("form",{class:"next-step-form"});
+    const stepInput=node("input",{type:"text",placeholder:"Ex.: retornar amanhã para confirmar o frete",maxlength:1000});
+    stepInput.required=true;
+    const stepButton=node("button",{class:"secondary",type:"submit"},"Registrar próximo passo");
+    stepForm.append(stepInput,stepButton);
+    stepForm.addEventListener("submit",async event=>{
+      event.preventDefault();
+      const description=stepInput.value.trim();if(!description)return;
+      stepButton.disabled=true;stepButton.textContent="Registrando...";
+      try{
+        const response=await api({action:"nextstep.create",conversation_id:c.id,descricao:description});
+        if(!response?.ok)throw new Error(response?.data?.error||response?.error||"Não foi possível registrar o próximo passo.");
+        const row=response.data.next_step;
+        const item=node("div",{class:"next-step-item"});
+        item.append(node("strong",{},row.descricao));
+        item.append(node("p",{class:"muted"},row.em?new Date(row.em).toLocaleString("pt-BR"):"Agora"));
+        stepsSection.insertBefore(item,stepForm);
+        stepInput.value="";
+        statusLine("Próximo passo registrado no CRM.");
+      }catch(error){statusLine(error.message||"Erro ao registrar próximo passo.",true);}
+      finally{stepButton.disabled=false;stepButton.textContent="Registrar próximo passo";}
+    });
+    stepsSection.append(stepForm);
+  }
+  resultEl.append(stepsSection);
 }
 function money(v){return Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});}
 function renderBudgets(budgets){
