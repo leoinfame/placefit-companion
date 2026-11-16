@@ -252,16 +252,17 @@ function renderSaveSummary(data){
 function renderCreateContact(phone){
   const section=node("section",{class:"create-contact"});
   section.append(node("h4",{},"Cadastrar contato no CRM"));
-  section.append(node("p",{class:"muted"},"Este telefone ainda não está cadastrado. Informe o nome para criar o contato e vincular esta conversa."));
+  section.append(node("p",{class:"muted"},phone?"Este telefone ainda não está cadastrado. Confirme o número e informe o nome para criar o contato.":"O WhatsApp não forneceu o telefone desta conversa. Informe manualmente o número com DDD e o nome do contato para cadastrá-lo no CRM."));
   const form=node("form",{class:"create-contact-form"});
   const nameInput=node("input",{type:"text",placeholder:"Nome do cliente",maxlength:200});
   nameInput.required=true;
   nameInput.autocomplete="name";
-  const phoneInput=node("input",{type:"tel",value:phone});
-  phoneInput.readOnly=true;
-  phoneInput.setAttribute("aria-label","Telefone identificado no WhatsApp");
+  const phoneInput=node("input",{type:"tel",value:phone||"",placeholder:"DDD + número do WhatsApp",maxlength:20});
+  phoneInput.readOnly=Boolean(phone);
+  phoneInput.required=true;
+  phoneInput.setAttribute("aria-label","Telefone WhatsApp");
   const phoneLabel=node("label",{class:"edit-field"});
-  phoneLabel.append(node("span",{},"Telefone WhatsApp"));
+  phoneLabel.append(node("span",{},phone?"Telefone WhatsApp identificado":"Telefone WhatsApp · informe com DDD"));
   phoneLabel.append(phoneInput);
   const nameLabel=node("label",{class:"edit-field"});
   nameLabel.append(node("span",{},"Nome do contato"));
@@ -272,10 +273,13 @@ function renderCreateContact(phone){
   form.addEventListener("submit",async event=>{
     event.preventDefault();
     const name=nameInput.value.trim();
+    const enteredPhone=phoneInput.value.trim();
+    const normalizedPhone=enteredPhone.replace(/\\D/g,"");
     if(!name){nameInput.focus();return;}
+    if(normalizedPhone.length<10||normalizedPhone.length>13){phoneInput.focus();statusLine("Informe um telefone válido com DDD e código do país, se necessário.",true);return;}
     submit.disabled=true;submit.textContent="Cadastrando...";
     try{
-      const response=await api({action:"contact.create",phone,name});
+      const response=await api({action:"contact.create",phone:normalizedPhone,name});
       if(!response?.ok){
         const code=response?.data?.error||response?.error||"CREATE_FAILED";
         if(code==="CONVERSATION_ALREADY_EXISTS"){
@@ -292,7 +296,7 @@ function renderCreateContact(phone){
       resultEl.replaceChildren();
       statusLine("Contato cadastrado e conversa vinculada ao telefone do WhatsApp.");
       lastLookupKey="";
-      await lookup(phone,"created");
+      await lookup(normalizedPhone,"created");
     }catch(error){
       statusLine(error?.message||"Falha ao cadastrar o contato.",true);
     }finally{
@@ -322,7 +326,7 @@ async function lookup(identifier,source="manual"){
     if(data.status==="matched"){renderMatched(data);return;}
     if(data.status==="ambiguous"){statusLine("Encontramos mais de uma conversa com este identificador. Não fizemos associação automática.",true);return;}
     statusLine("Não foi possível identificar este contato. Use a busca manual pelo telefone; não faremos associação por nome.");
-    if(!isLid&&wantedPhone.length>=10&&wantedPhone.length<=11)renderCreateContact(clean);
+    renderCreateContact(!isLid&&clean.replace(/\\D/g,"").length>=10&&clean.replace(/\\D/g,"").length<=11?clean:"");
   }catch(error){
     if(sequence!==lookupSequence)return;
     resultEl.replaceChildren();statusLine(error?.message||"Falha ao consultar o CRM.",true);
@@ -373,6 +377,7 @@ async function refreshContext(){
     lookupPhone.value="";
     contextEl.textContent="Conversa aberta, mas o WhatsApp não forneceu um identificador confiável. Use a busca manual; não faremos associação por nome.";
     statusLine("Identificação automática indisponível. Os dados da conversa anterior foram limpos.");
+    renderCreateContact("");
   }
 }
 connectBtn.addEventListener("click",async()=>{
@@ -428,6 +433,7 @@ refreshChatBtn.addEventListener("click",async()=>{
       lookupPhone.value="";
       contextEl.textContent="Conversa aberta, mas não foi encontrado telefone ou identificador confiável.";
       statusLine("Não foi possível identificar este contato. Use a busca manual pelo telefone; não faremos associação por nome.");
+      renderCreateContact("");
     }
   }catch(error){
     resultEl.replaceChildren();
